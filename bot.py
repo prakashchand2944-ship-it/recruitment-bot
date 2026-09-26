@@ -235,7 +235,7 @@ def webhook_handler():
 
 if __name__ == '__main__':
     # Auto-checker ko background thread mein start karna
-    threading.Thread(target=auto_check_job, daemon=True).strart() if hasattr(threading.Thread(target=auto_check_job, daemon=True), 'strart') else threading.Thread(target=auto_check_job, daemon=True).start()
+    threading.Thread(target=auto_check_job, daemon=True).start() if hasattr(threading.Thread(target=auto_check_job, daemon=True), 'start') else threading.Thread(target=auto_check_job, daemon=True).start()
     
     # Flask app run karna
     port = int(os.environ.get("PORT", 10000))
