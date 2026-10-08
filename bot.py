@@ -6,12 +6,21 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from flask import Flask, request
 
-# --- CONFIGURATION ---
-TELEGRAM_BOT_TOKEN = "8794314361:AAEXgvzW2E8KVACi-NnIQI0NCzE8SHWr58s"
-GEMINI_API_KEY = "AQ.Ab8RN6L01GyaDIWE_tA8amlG19II63e4AylDxyeG8SKoBpiq_A"
 
-TARGET_CHAT_ID = None 
-TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+# =========================================================
+# CONFIGURATION
+# =========================================================
+
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+RENDER_URL = "https://recruitment-bot-2.onrender.com"
+
+TELEGRAM_API_URL = (
+    f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+    if TELEGRAM_BOT_TOKEN
+    else ""
+)
 
 AVAILABLE_MODELS = [
     "gemini-3.8-flash",
@@ -20,223 +29,924 @@ AVAILABLE_MODELS = [
     "gemini-flash-latest"
 ]
 
-AUTO_CHECK_URLS = {
-    "Rajasthan RSSB / RSMSSB": {"url": "https://rsmssb.rajasthan.gov.in", "keys": ["rssb", "rsmssb", "rajasthan", "gram vikas", "patwari"]},
-    "Rajasthan RPSC": {"url": "https://rpsc.rajasthan.gov.in", "keys": ["rpsc", "ras", "school lecturer"]},
-    "Teacher Grade 3rd / REET (RBSE)": {"url": "https://rajeduboard.rajasthan.gov.in", "keys": ["reet", "grade 3", "rbse", "teacher"]},
-    "Rajasthan SSO Portal": {"url": "https://sso.rajasthan.gov.in", "keys": ["sso"]},
-    "Rajasthan Medical & Health (Raj Health)": {"url": "https://rajhealth.rajasthan.gov.in", "keys": ["medical", "health", "nurse", "anm", "gnm"]},
-    "Rajasthan High Court (RHC)": {"url": "https://hcraj.nic.in", "keys": ["high court", "hc", "clerk", "steno"]},
-    "SSC (Staff Selection Commission)": {"url": "https://ssc.gov.in", "keys": ["ssc", "cgl", "chsl", "gd", "mts"]},
-    "UPSC (Union Public Service Commission)": {"url": "https://upsc.gov.in", "keys": ["upsc", "civil services", "ias", "ips", "nda", "cds"]},
-    "Railway Recruitment Board (RRB)": {"url": "https://indianrailways.gov.in", "keys": ["railway", "rrb", "rrc", "ntpc", "group d", "alp"]},
-    "IBPS (Banking)": {"url": "https://ibps.in", "keys": ["ibps", "bank", "sbi", "po", "clerk"]},
-    "NTA (CTET/National Testing)": {"url": "https://nta.ac.in", "keys": ["nta", "ctet", "neet", "cuet"]},
-    "NCS Central Govt Portal": {"url": "https://ncs.gov.in", "keys": ["ncs", "central"]}
-}
+TARGET_CHAT_ID = None
 
 SEEN_PDF_LINKS = set()
 
-def clean_url(text: str) -> str:
-    import re
-    url_pattern = r'https?://[^\s\)\]]+'
-    match = re.search(url_pattern, text)
-    return match.group(0) if match else None
+CHECK_INTERVAL = 3600
 
-def fetch_webpage_details(url: str):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+
+# =========================================================
+# PORTALS
+# =========================================================
+
+AUTO_CHECK_URLS = {
+    "Rajasthan RSSB / RSMSSB": {
+        "url": "https://rsmssb.rajasthan.gov.in",
+        "keys": [
+            "rssb",
+            "rsmssb",
+            "rajasthan",
+            "gram vikas",
+            "patwari"
+        ]
+    },
+
+    "Rajasthan RPSC": {
+        "url": "https://rpsc.rajasthan.gov.in",
+        "keys": [
+            "rpsc",
+            "ras",
+            "school lecturer"
+        ]
+    },
+
+    "Teacher Grade 3rd / REET": {
+        "url": "https://rajeduboard.rajasthan.gov.in",
+        "keys": [
+            "reet",
+            "grade 3",
+            "rbse",
+            "teacher"
+        ]
+    },
+
+    "Rajasthan SSO Portal": {
+        "url": "https://sso.rajasthan.gov.in",
+        "keys": [
+            "sso"
+        ]
+    },
+
+    "Rajasthan Medical & Health": {
+        "url": "https://rajhealth.rajasthan.gov.in",
+        "keys": [
+            "medical",
+            "health",
+            "nurse",
+            "anm",
+            "gnm"
+        ]
+    },
+
+    "Rajasthan High Court": {
+        "url": "https://hcraj.nic.in",
+        "keys": [
+            "high court",
+            "hc",
+            "clerk",
+            "steno"
+        ]
+    },
+
+    "SSC": {
+        "url": "https://ssc.gov.in",
+        "keys": [
+            "ssc",
+            "cgl",
+            "chsl",
+            "gd",
+            "mts"
+        ]
+    },
+
+    "UPSC": {
+        "url": "https://upsc.gov.in",
+        "keys": [
+            "upsc",
+            "civil services",
+            "ias",
+            "ips",
+            "nda",
+            "cds"
+        ]
+    },
+
+    "Railway Recruitment Board": {
+        "url": "https://indianrailways.gov.in",
+        "keys": [
+            "railway",
+            "rrb",
+            "rrc",
+            "ntpc",
+            "group d",
+            "alp"
+        ]
+    },
+
+    "IBPS": {
+        "url": "https://ibps.in",
+        "keys": [
+            "ibps",
+            "bank",
+            "sbi",
+            "po",
+            "clerk"
+        ]
+    },
+
+    "NTA": {
+        "url": "https://nta.ac.in",
+        "keys": [
+            "nta",
+            "ctet",
+            "neet",
+            "cuet"
+        ]
+    },
+
+    "NCS Central Govt Portal": {
+        "url": "https://ncs.gov.in",
+        "keys": [
+            "ncs",
+            "central"
+        ]
     }
-    try:
-        response = requests.get(url, headers=headers, timeout=12)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
+}
 
-        keywords = ['recruitment', 'notification', 'advt', 'advertisement', 'press', 'notice', 'reet', 'result', 'exam', 'pdf']
 
-        pdf_links = []
-        for a_tag in soup.find_all('a', href=True):
-            href = a_tag['href'].strip()
-            link_text = a_tag.get_text().strip().lower()
+# =========================================================
+# FLASK
+# =========================================================
 
-            if href.lower().endswith('.pdf') or any(kw in link_text for kw in keywords) or any(kw in href.lower() for kw in keywords):
-                if '.pdf' in href.lower():
-                    full_pdf_url = urljoin(url, href)
-                    if full_pdf_url not in pdf_links and full_pdf_url.startswith("http"):
-                        pdf_links.append(full_pdf_url)
+app = Flask(__name__)
 
-        for element in soup(["script", "style", "nav", "footer", "header", "noscript"]):
-            element.decompose()
 
-        text = soup.get_text(separator=' ')
-        clean_text = ' '.join(text.split())[:3500]
+# =========================================================
+# BASIC CHECK
+# =========================================================
 
-        return clean_text, pdf_links
-    except Exception as e:
-        print(f"Scraping error: {e}")
-        return None, []
+@app.route("/")
+def home():
+    return "Recruitment Bot Webhook is active!"
 
-def is_valid_recruitment_text(text: str) -> bool:
-    if not text or len(text.strip()) < 100:
+
+# =========================================================
+# TELEGRAM SEND MESSAGE
+# =========================================================
+
+def send_telegram_message(chat_id, text):
+
+    if not TELEGRAM_BOT_TOKEN:
+        print("ERROR: TELEGRAM_BOT_TOKEN missing")
         return False
-    error_keywords = ["access denied", "403 forbidden", "404 not found", "error", "service unavailable", "enable javascript"]
-    low_text = text.lower()
-    if any(err in low_text for err in error_keywords) and len(text) < 300:
-        return False
-    return True
 
-def call_gemini_api(prompt_text: str) -> str:
-    headers = {'Content-Type': 'application/json'}
-    formatted_prompt = (
-        "You are an expert government job analyst. Carefully analyze the text provided below and extract "
-        "the exact recruitment/exam details. Present it in clear Hindi with the following strict structure. "
-        "If the text has NO recruitment details or is an error page, reply strictly with: 'NO_RECRUITMENT_DATA'\n\n"
-        "📢 *RECRUITMENT NOTIFICATION SUMMARY*\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "📌 *विभाग / बोर्ड:* \n"
-        "💼 *पद का नाम (Post):* \n"
-        "🔢 *कुल पद (Total Vacancies):* \n"
-        "📅 *महत्वपूर्ण तिथियां (Dates):* \n"
-        "🎂 *आयु सीमा (Age Limit):* \n"
-        "🎓 *शैक्षणिक योग्यता (Qualification):* \n"
-        "💰 *आवेदन शुल्क / वेतन (Fee/Pay):* \n"
-        "📝 *आवेदन कैसे करें (How to Apply):* \n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"Official Web Text:\n{prompt_text[:2500]}"
-    )
-    data = {"contents": [{"parts": [{"text": formatted_prompt}]}]}
-
-    for attempt in range(2):
-        for model in AVAILABLE_MODELS:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
-            try:
-                res = requests.post(url, headers=headers, json=data, timeout=15)
-                res_json = res.json()
-                if 'candidates' in res_json and len(res_json['candidates']) > 0:
-                    candidate = res_json['candidates'][0]
-                    if 'content' in candidate and 'parts' in candidate['content']:
-                        return candidate['content']['parts'][0]['text']
-                time.sleep(1.5)
-            except Exception:
-                time.sleep(1)
-        time.sleep(3)
-    return "⚠️ High Demand Error: API busy hai."
-
-def send_telegram_message(chat_id: int, text: str):
     if not chat_id:
-        return
+        return False
+
     url = f"{TELEGRAM_API_URL}/sendMessage"
+
     payload = {
-        "chat_id": chat_id, 
+        "chat_id": chat_id,
         "text": text,
         "parse_mode": "Markdown",
         "disable_web_page_preview": True
     }
-    requests.post(url, json=payload)
 
-# --- BACKGROUND AUTOMATIC CHECKER ---
+    try:
+        response = requests.post(
+            url,
+            json=payload,
+            timeout=20
+        )
+
+        print(
+            "Telegram response:",
+            response.status_code,
+            response.text[:500]
+        )
+
+        return response.ok
+
+    except Exception as e:
+        print("Telegram send error:", e)
+        return False
+
+
+# =========================================================
+# SET TELEGRAM WEBHOOK
+# =========================================================
+
+def set_webhook():
+
+    if not TELEGRAM_BOT_TOKEN:
+        print("ERROR: TELEGRAM_BOT_TOKEN is missing")
+        return
+
+    webhook_url = f"{RENDER_URL}/webhook"
+
+    url = f"{TELEGRAM_API_URL}/setWebhook"
+
+    try:
+
+        response = requests.get(
+            url,
+            params={"url": webhook_url},
+            timeout=20
+        )
+
+        print("Webhook setup response:")
+        print(response.text)
+
+    except Exception as e:
+        print("Webhook setup error:", e)
+
+
+# =========================================================
+# TELEGRAM WEBHOOK INFO
+# =========================================================
+
+def get_webhook_info():
+
+    if not TELEGRAM_BOT_TOKEN:
+        return
+
+    try:
+
+        url = f"{TELEGRAM_API_URL}/getWebhookInfo"
+
+        response = requests.get(
+            url,
+            timeout=20
+        )
+
+        print("Webhook info:")
+        print(response.text)
+
+    except Exception as e:
+        print("Webhook info error:", e)
+
+
+# =========================================================
+# URL CLEANER
+# =========================================================
+
+def clean_url(text):
+
+    import re
+
+    if not text:
+        return None
+
+    url_pattern = r'https?://[^\s\)\]]+'
+
+    match = re.search(
+        url_pattern,
+        text
+    )
+
+    return match.group(0) if match else None
+
+
+# =========================================================
+# FETCH WEBPAGE
+# =========================================================
+
+def fetch_webpage_details(url):
+
+    headers = {
+        "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 "
+        "(KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    }
+
+    try:
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=20
+        )
+
+        response.raise_for_status()
+
+        soup = BeautifulSoup(
+            response.text,
+            "html.parser"
+        )
+
+        keywords = [
+            "recruitment",
+            "notification",
+            "advt",
+            "advertisement",
+            "press",
+            "notice",
+            "reet",
+            "result",
+            "exam",
+            "pdf",
+            "vacancy",
+            "vacancies",
+            "recruit"
+        ]
+
+        pdf_links = []
+
+        for a_tag in soup.find_all(
+            "a",
+            href=True
+        ):
+
+            href = a_tag["href"].strip()
+
+            link_text = (
+                a_tag.get_text()
+                .strip()
+                .lower()
+            )
+
+            full_url = urljoin(
+                url,
+                href
+            )
+
+            href_lower = href.lower()
+
+            if (
+                href_lower.endswith(".pdf")
+                or ".pdf" in href_lower
+                or any(
+                    keyword in link_text
+                    for keyword in keywords
+                )
+                or any(
+                    keyword in href_lower
+                    for keyword in keywords
+                )
+            ):
+
+                if (
+                    ".pdf" in href_lower
+                    and full_url.startswith("http")
+                    and full_url not in pdf_links
+                ):
+                    pdf_links.append(full_url)
+
+        # Remove unnecessary HTML
+        for element in soup([
+            "script",
+            "style",
+            "nav",
+            "footer",
+            "header",
+            "noscript"
+        ]):
+            element.decompose()
+
+        text = soup.get_text(
+            separator=" "
+        )
+
+        clean_text = " ".join(
+            text.split()
+        )
+
+        clean_text = clean_text[:5000]
+
+        return clean_text, pdf_links
+
+    except Exception as e:
+
+        print(
+            f"Scraping error for {url}:",
+            e
+        )
+
+        return None, []
+
+
+# =========================================================
+# VALID PAGE CHECK
+# =========================================================
+
+def is_valid_recruitment_text(text):
+
+    if not text:
+        return False
+
+    if len(text.strip()) < 100:
+        return False
+
+    error_keywords = [
+        "access denied",
+        "403 forbidden",
+        "404 not found",
+        "service unavailable",
+        "enable javascript"
+    ]
+
+    low_text = text.lower()
+
+    if (
+        any(
+            error in low_text
+            for error in error_keywords
+        )
+        and len(text) < 500
+    ):
+        return False
+
+    return True
+
+
+# =========================================================
+# GEMINI
+# =========================================================
+
+def call_gemini_api(prompt_text):
+
+    if not GEMINI_API_KEY:
+
+        return (
+            "⚠️ Gemini API Key उपलब्ध नहीं है। "
+            "Render Environment Variables में "
+            "GEMINI_API_KEY चेक करें।"
+        )
+
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    formatted_prompt = f"""
+You are an expert Indian government recruitment analyst.
+
+Analyze the official website text below.
+
+Your job is to identify ONLY genuine recruitment,
+vacancy, application or recruitment notification information.
+
+Ignore:
+- Results
+- Admit cards
+- Answer keys
+- Old notices
+- Exam schedules without recruitment
+- General news
+- Error pages
+
+If there is no genuine recruitment information,
+reply exactly:
+
+NO_RECRUITMENT_DATA
+
+If recruitment information exists, answer in clear Hindi
+using this structure:
+
+📢 RECRUITMENT NOTIFICATION
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+📌 विभाग / बोर्ड:
+💼 पद का नाम:
+🔢 कुल पद:
+📅 महत्वपूर्ण तिथियां:
+🎂 आयु सीमा:
+🎓 शैक्षणिक योग्यता:
+💰 आवेदन शुल्क:
+💵 वेतन / Pay:
+📝 आवेदन कैसे करें:
+🔗 आधिकारिक वेबसाइट:
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+Official Web Text:
+
+{prompt_text[:4500]}
+"""
+
+    data = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": formatted_prompt
+                    }
+                ]
+            }
+        ]
+    }
+
+    for model in AVAILABLE_MODELS:
+
+        url = (
+            "https://generativelanguage.googleapis.com/"
+            f"v1beta/models/{model}:generateContent"
+            f"?key={GEMINI_API_KEY}"
+        )
+
+        try:
+
+            response = requests.post(
+                url,
+                headers=headers,
+                json=data,
+                timeout=30
+            )
+
+            print(
+                f"Gemini {model}:",
+                response.status_code
+            )
+
+            response_json = response.json()
+
+            if (
+                "candidates" in response_json
+                and response_json["candidates"]
+            ):
+
+                candidate = (
+                    response_json["candidates"][0]
+                )
+
+                content = candidate.get(
+                    "content",
+                    {}
+                )
+
+                parts = content.get(
+                    "parts",
+                    []
+                )
+
+                if parts:
+
+                    return parts[0].get(
+                        "text",
+                        "NO_RECRUITMENT_DATA"
+                    )
+
+            time.sleep(2)
+
+        except Exception as e:
+
+            print(
+                f"Gemini error ({model}):",
+                e
+            )
+
+            time.sleep(2)
+
+    return (
+        "⚠️ Gemini अभी response नहीं दे रहा है। "
+        "कुछ देर बाद दोबारा कोशिश करें।"
+    )
+
+
+# =========================================================
+# PORTAL CHECK
+# =========================================================
+
+def check_portal(
+    portal_name,
+    portal_data
+):
+
+    portal_url = portal_data["url"]
+
+    print(
+        f"Checking: {portal_name}"
+    )
+
+    web_text, pdf_links = (
+        fetch_webpage_details(
+            portal_url
+        )
+    )
+
+    if not is_valid_recruitment_text(
+        web_text
+    ):
+
+        print(
+            f"Invalid page: {portal_name}"
+        )
+
+        return None, []
+
+    summary = call_gemini_api(
+        web_text
+    )
+
+    if (
+        not summary
+        or "NO_RECRUITMENT_DATA"
+        in summary
+    ):
+
+        return None, pdf_links
+
+    return summary, pdf_links
+
+
+# =========================================================
+# MANUAL PORTAL CHECK
+# =========================================================
+
+def send_portal_update(
+    chat_id,
+    portal_name,
+    portal_data
+):
+
+    send_telegram_message(
+        chat_id,
+        f"🔍 *{portal_name}* का official portal check किया जा रहा है..."
+    )
+
+    summary, pdf_links = check_portal(
+        portal_name,
+        portal_data
+    )
+
+    if not summary:
+
+        send_telegram_message(
+            chat_id,
+            f"ℹ️ *{portal_name}* पर फिलहाल "
+            "कोई स्पष्ट नई recruitment notification नहीं मिली।"
+        )
+
+        return
+
+    response_msg = (
+        f"📢 *LATEST UPDATE — "
+        f"{portal_name.upper()}*\n\n"
+        f"{summary}"
+    )
+
+    if pdf_links:
+
+        response_msg += (
+            "\n\n📄 *OFFICIAL PDF LINKS:*\n"
+        )
+
+        for index, pdf in enumerate(
+            pdf_links[:5],
+            1
+        ):
+
+            response_msg += (
+                f"{index}. [Official PDF]({pdf})\n"
+            )
+
+    send_telegram_message(
+        chat_id,
+        response_msg
+    )
+
+
+# =========================================================
+# BACKGROUND AUTOMATIC CHECKER
+# =========================================================
+
 def auto_check_job():
-    global TARGET_CHAT_ID, SEEN_PDF_LINKS
-    print("Auto-checking portals started...")
-    time.sleep(15)
+
+    global TARGET_CHAT_ID
+    global SEEN_PDF_LINKS
+
+    print(
+        "Automatic recruitment checker started."
+    )
+
+    time.sleep(20)
 
     while True:
-        if TARGET_CHAT_ID:
-            for portal_name, data in AUTO_CHECK_URLS.items():
-                portal_url = data["url"]
-                web_text, pdf_links = fetch_webpage_details(portal_url)
 
-                if not is_valid_recruitment_text(web_text):
-                    time.sleep(5)
-                    continue
+        try:
 
-                new_pdfs = [pdf for pdf in pdf_links if pdf not in SEEN_PDF_LINKS]
-                if new_pdfs:
-                    summary = call_gemini_api(web_text)
-                    if "NO_RECRUITMENT_DATA" not in summary and summary.count("जानकारी उपलब्ध नहीं") < 5:
-                        alert_msg = f"🔔 *NEW UPDATE: {portal_name.upper()}*\n\n" + summary
-                        alert_msg += "\n\n📄 *OFFICIAL NOTIFICATION PDF:* \n"
-                        for idx, pdf in enumerate(new_pdfs[:3], 1):
-                            SEEN_PDF_LINKS.add(pdf)
-                            alert_msg += f"🔗 [Download Official PDF {idx}]({pdf})\n"
-                        send_telegram_message(TARGET_CHAT_ID, alert_msg)
-                time.sleep(10)
-        time.sleep(3600) # Har 1 ghante mein check karega
+            if TARGET_CHAT_ID:
 
-# --- FLASK WEB SERVER & WEBHOOK HANDLER ---
-app = Flask(__name__)
+                print(
+                    "Starting automatic portal scan..."
+                )
 
-@app.route('/')
-def home():
-    return "Recruitment Bot Webhook is active!"
+                for portal_name, portal_data in AUTO_CHECK_URLS.items():
 
-@app.route('/webhook', methods=['POST'])
-def webhook_handler():
-    global TARGET_CHAT_ID
-    data = request.get_json()
-    
-    if data and "message" in data:
-        message = data["message"]
-        if "text" in message:
-            chat_id = message["chat"]["id"]
-            TARGET_CHAT_ID = chat_id 
-            user_text = message["text"].lower()
+                    try:
 
-            # Check if user sent a direct URL
-            url = clean_url(user_text)
-            if url:
-                send_telegram_message(chat_id, "🔍 *Link analyze ho raha hai... Wait karein...*")
-                web_text, pdf_links = fetch_webpage_details(url)
-                if not is_valid_recruitment_text(web_text):
-                    send_telegram_message(chat_id, "ℹ️ Filhal is link par koi new update nahi hai.")
-                    return "OK", 200
-                summary = call_gemini_api(web_text)
-                if "NO_RECRUITMENT_DATA" in summary or summary.count("जानकारी उपलब्ध नहीं") >= 5:
-                    send_telegram_message(chat_id, "ℹ️ Filhal is link par koi new update nahi hai.")
-                else:
-                    if pdf_links:
-                        summary += "\n\n📄 *OFFICIAL NOTIFICATION PDF LINKS:*\n"
-                        for idx, pdf in enumerate(pdf_links[:5], 1):
-                            summary += f"🔗 [Download Official PDF {idx}]({pdf})\n"
-                    send_telegram_message(chat_id, summary)
-                return "OK", 200
+                        web_text, pdf_links = (
+                            fetch_webpage_details(
+                                portal_data["url"]
+                            )
+                        )
 
-            # Check if user asked for a specific portal by name
-            matched_portal = None
-            matched_url = None
-            for portal_name, data_dict in AUTO_CHECK_URLS.items():
-                if any(key in user_text for key in data_dict["keys"]):
-                    matched_portal = portal_name
-                    matched_url = data_dict["url"]
-                    break
+                        if not is_valid_recruitment_text(
+                            web_text
+                        ):
 
-            if matched_portal:
-                send_telegram_message(chat_id, f"🔍 *{matched_portal}* portal check kiya ja raha hai...")
-                web_text, pdf_links = fetch_webpage_details(matched_url)
+                            continue
 
-                if not is_valid_recruitment_text(web_text):
-                    send_telegram_message(chat_id, f"ℹ️ *{matched_portal}:* Filhal koi new update nahi hai.")
-                    return "OK", 200
+                        new_pdfs = [
+                            pdf
+                            for pdf in pdf_links
+                            if pdf not in SEEN_PDF_LINKS
+                        ]
 
-                summary = call_gemini_api(web_text)
-                if "NO_RECRUITMENT_DATA" in summary or summary.count("जानकारी उपलब्ध नहीं") >= 5:
-                    send_telegram_message(chat_id, f"ℹ️ *{matched_portal}:* Filhal koi new update nahi hai.")
-                else:
-                    response_msg = f"📌 *LATEST UPDATE FROM {matched_portal.upper()}:*\n\n" + summary
-                    if pdf_links:
-                        response_msg += "\n\n📄 *OFFICIAL PDF LINKS:*\n"
-                        for idx, pdf in enumerate(pdf_links[:3], 1):
-                            response_msg += f"🔗 [Download PDF {idx}]({pdf})\n"
-                    send_telegram_message(chat_id, response_msg)
+                        if new_pdfs:
+
+                            summary = call_gemini_api(
+                                web_text
+                            )
+
+                            if (
+                                summary
+                                and
+                                "NO_RECRUITMENT_DATA"
+                                not in summary
+                            ):
+
+                                alert_msg = (
+                                    f"🔔 *NEW RECRUITMENT UPDATE*\n\n"
+                                    f"📌 *Portal:* "
+                                    f"{portal_name}\n\n"
+                                    f"{summary}"
+                                )
+
+                                alert_msg += (
+                                    "\n\n📄 *OFFICIAL NOTIFICATION PDF:*\n"
+                                )
+
+                                for index, pdf in enumerate(
+                                    new_pdfs[:3],
+                                    1
+                                ):
+
+                                    alert_msg += (
+                                        f"{index}. "
+                                        f"[Official PDF]({pdf})\n"
+                                    )
+
+                                    SEEN_PDF_LINKS.add(
+                                        pdf
+                                    )
+
+                                send_telegram_message(
+                                    TARGET_CHAT_ID,
+                                    alert_msg
+                                )
+
+                        time.sleep(5)
+
+                    except Exception as e:
+
+                        print(
+                            f"Portal checker error "
+                            f"{portal_name}:",
+                            e
+                        )
+
             else:
-                send_telegram_message(chat_id, "🤖 Main automatic monitoring kar raha hoon. Aap chahein toh kisi bhi portal ka naam likh sakte hain (jaise: 'Railway ke update batao', 'SSC ka kya hai').")
 
-    return "OK", 200
+                print(
+                    "TARGET_CHAT_ID not set. "
+                    "Send /start to the bot first."
+                )
 
-if __name__ == '__main__':
-    # Auto-checker ko background thread mein start karna
-    threading.Thread(target=auto_check_job, daemon=True).start() if hasattr(threading.Thread(target=auto_check_job, daemon=True), 'start') else threading.Thread(target=auto_check_job, daemon=True).start()
-    
-    # Flask app run karna
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+            print(
+                "Automatic scan finished. "
+                f"Next scan in {CHECK_INTERVAL} seconds."
+            )
+
+            time.sleep(
+                CHECK_INTERVAL
+            )
+
+        except Exception as e:
+
+            print(
+                "Automatic checker error:",
+                e
+            )
+
+            time.sleep(60)
+
+
+# =========================================================
+# TELEGRAM WEBHOOK
+# =========================================================
+
+@app.route(
+    "/webhook",
+    methods=["POST"]
+)
+def webhook_handler():
+
+    global TARGET_CHAT_ID
+
+    try:
+
+        data = request.get_json(
+            silent=True
+        )
+
+        if not data:
+
+            return "OK", 200
+
+        if "message" not in data:
+
+            return "OK", 200
+
+        message = data["message"]
+
+        chat = message.get(
+            "chat",
+            {}
+        )
+
+        chat_id = chat.get(
+            "id"
+        )
+
+        text = message.get(
+            "text",
+            ""
+        ).strip()
+
+        if not chat_id:
+
+            return "OK", 200
+
+        TARGET_CHAT_ID = chat_id
+
+        user_text = text.lower()
+
+        print(
+            f"Telegram message received: {text}"
+        )
+
+        # -------------------------------------------------
+        # START
+        # -------------------------------------------------
+
+        if user_text in [
+            "/start",
+            "start"
+        ]:
+
+            send_telegram_message(
+                chat_id,
+                """🤖 *Government Recruitment Bot*
+
+नमस्ते! 👋
+
+मैं सरकारी भर्ती notifications को monitor करने में आपकी मदद कर सकता हूँ।
+
+📌 *Commands:*
+
+/start — Bot शुरू करें
+/status — Bot की स्थिति
+/check — सभी portals check करें
+
+आप सीधे लिख सकते हैं:
+
+• Railway के update
+• SSC के update
+• RPSC के update
+• RSSB के update
+• REET के update
+• Rajasthan High Court के update
+
+या किसी official website का link भेज सकते हैं।
+
+🔔 नई recruitment notification मिलने पर मैं आपको alert भेजूँगा।"""
+            )
+
+            return "OK", 200
+
+        # -------------------------------------------------
+        # STATUS
+        # -------------------------------------------------
+
+        if user_text == "/status":
+
+            send_telegram_message(
+                chat_id,
+                """✅ *BOT STATUS*
+
+🟢 Render Server: Online
+🟢 Telegram Webhook: Active
+🟢 Recruitment Monitor: Ready
+🟢 Gemini Analyzer: Configured
+
+आप `/check` भेजकर portal checking शुरू कर सकते हैं।"""
+            )
+
+            return "OK", 200
+
+        # -------------------------------------------------
+        # MANUAL CHECK
+        # -------------------------------------------------
+
+        if user_text == "/check":
+
+            send_telegram_message(
+                chat_id,
+                "🔍 सभी recruitment portals check किए जा रहे हैं..."
+            )
+
+            for portal_name,
