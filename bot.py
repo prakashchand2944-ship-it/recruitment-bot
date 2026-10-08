@@ -30,9 +30,7 @@ AVAILABLE_MODELS = [
 ]
 
 TARGET_CHAT_ID = None
-
 SEEN_PDF_LINKS = set()
-
 CHECK_INTERVAL = 3600
 
 
@@ -43,124 +41,62 @@ CHECK_INTERVAL = 3600
 AUTO_CHECK_URLS = {
     "Rajasthan RSSB / RSMSSB": {
         "url": "https://rsmssb.rajasthan.gov.in",
-        "keys": [
-            "rssb",
-            "rsmssb",
-            "rajasthan",
-            "gram vikas",
-            "patwari"
-        ]
+        "keys": ["rssb", "rsmssb", "rajasthan", "gram vikas", "patwari"]
     },
 
     "Rajasthan RPSC": {
         "url": "https://rpsc.rajasthan.gov.in",
-        "keys": [
-            "rpsc",
-            "ras",
-            "school lecturer"
-        ]
+        "keys": ["rpsc", "ras", "school lecturer"]
     },
 
     "Teacher Grade 3rd / REET": {
         "url": "https://rajeduboard.rajasthan.gov.in",
-        "keys": [
-            "reet",
-            "grade 3",
-            "rbse",
-            "teacher"
-        ]
+        "keys": ["reet", "grade 3", "rbse", "teacher"]
     },
 
     "Rajasthan SSO Portal": {
         "url": "https://sso.rajasthan.gov.in",
-        "keys": [
-            "sso"
-        ]
+        "keys": ["sso"]
     },
 
     "Rajasthan Medical & Health": {
         "url": "https://rajhealth.rajasthan.gov.in",
-        "keys": [
-            "medical",
-            "health",
-            "nurse",
-            "anm",
-            "gnm"
-        ]
+        "keys": ["medical", "health", "nurse", "anm", "gnm"]
     },
 
     "Rajasthan High Court": {
         "url": "https://hcraj.nic.in",
-        "keys": [
-            "high court",
-            "hc",
-            "clerk",
-            "steno"
-        ]
+        "keys": ["high court", "hc", "clerk", "steno"]
     },
 
     "SSC": {
         "url": "https://ssc.gov.in",
-        "keys": [
-            "ssc",
-            "cgl",
-            "chsl",
-            "gd",
-            "mts"
-        ]
+        "keys": ["ssc", "cgl", "chsl", "gd", "mts"]
     },
 
     "UPSC": {
         "url": "https://upsc.gov.in",
-        "keys": [
-            "upsc",
-            "civil services",
-            "ias",
-            "ips",
-            "nda",
-            "cds"
-        ]
+        "keys": ["upsc", "civil services", "ias", "ips", "nda", "cds"]
     },
 
     "Railway Recruitment Board": {
         "url": "https://indianrailways.gov.in",
-        "keys": [
-            "railway",
-            "rrb",
-            "rrc",
-            "ntpc",
-            "group d",
-            "alp"
-        ]
+        "keys": ["railway", "rrb", "rrc", "ntpc", "group d", "alp"]
     },
 
     "IBPS": {
         "url": "https://ibps.in",
-        "keys": [
-            "ibps",
-            "bank",
-            "sbi",
-            "po",
-            "clerk"
-        ]
+        "keys": ["ibps", "bank", "sbi", "po", "clerk"]
     },
 
     "NTA": {
         "url": "https://nta.ac.in",
-        "keys": [
-            "nta",
-            "ctet",
-            "neet",
-            "cuet"
-        ]
+        "keys": ["nta", "ctet", "neet", "cuet"]
     },
 
     "NCS Central Govt Portal": {
         "url": "https://ncs.gov.in",
-        "keys": [
-            "ncs",
-            "central"
-        ]
+        "keys": ["ncs", "central"]
     }
 }
 
@@ -172,17 +108,13 @@ AUTO_CHECK_URLS = {
 app = Flask(__name__)
 
 
-# =========================================================
-# BASIC CHECK
-# =========================================================
-
 @app.route("/")
 def home():
     return "Recruitment Bot Webhook is active!"
 
 
 # =========================================================
-# TELEGRAM SEND MESSAGE
+# TELEGRAM
 # =========================================================
 
 def send_telegram_message(chat_id, text):
@@ -224,7 +156,7 @@ def send_telegram_message(chat_id, text):
 
 
 # =========================================================
-# SET TELEGRAM WEBHOOK
+# WEBHOOK
 # =========================================================
 
 def set_webhook():
@@ -238,7 +170,6 @@ def set_webhook():
     url = f"{TELEGRAM_API_URL}/setWebhook"
 
     try:
-
         response = requests.get(
             url,
             params={"url": webhook_url},
@@ -252,17 +183,12 @@ def set_webhook():
         print("Webhook setup error:", e)
 
 
-# =========================================================
-# TELEGRAM WEBHOOK INFO
-# =========================================================
-
 def get_webhook_info():
 
     if not TELEGRAM_BOT_TOKEN:
         return
 
     try:
-
         url = f"{TELEGRAM_API_URL}/getWebhookInfo"
 
         response = requests.get(
@@ -299,7 +225,7 @@ def clean_url(text):
 
 
 # =========================================================
-# FETCH WEBPAGE
+# WEBSITE FETCHER
 # =========================================================
 
 def fetch_webpage_details(url):
@@ -385,7 +311,6 @@ def fetch_webpage_details(url):
                 ):
                     pdf_links.append(full_url)
 
-        # Remove unnecessary HTML
         for element in soup([
             "script",
             "style",
@@ -417,10 +342,6 @@ def fetch_webpage_details(url):
 
         return None, []
 
-
-# =========================================================
-# VALID PAGE CHECK
-# =========================================================
 
 def is_valid_recruitment_text(text):
 
@@ -558,9 +479,7 @@ Official Web Text:
                 and response_json["candidates"]
             ):
 
-                candidate = (
-                    response_json["candidates"][0]
-                )
+                candidate = response_json["candidates"][0]
 
                 content = candidate.get(
                     "content",
@@ -642,10 +561,6 @@ def check_portal(
     return summary, pdf_links
 
 
-# =========================================================
-# MANUAL PORTAL CHECK
-# =========================================================
-
 def send_portal_update(
     chat_id,
     portal_name,
@@ -697,8 +612,6 @@ def send_portal_update(
         chat_id,
         response_msg
     )
-
-
 # =========================================================
 # BACKGROUND AUTOMATIC CHECKER
 # =========================================================
@@ -737,7 +650,6 @@ def auto_check_job():
                         if not is_valid_recruitment_text(
                             web_text
                         ):
-
                             continue
 
                         new_pdfs = [
@@ -760,9 +672,8 @@ def auto_check_job():
                             ):
 
                                 alert_msg = (
-                                    f"🔔 *NEW RECRUITMENT UPDATE*\n\n"
-                                    f"📌 *Portal:* "
-                                    f"{portal_name}\n\n"
+                                    "🔔 *NEW RECRUITMENT UPDATE*\n\n"
+                                    f"📌 *Portal:* {portal_name}\n\n"
                                     f"{summary}"
                                 )
 
@@ -844,11 +755,9 @@ def webhook_handler():
         )
 
         if not data:
-
             return "OK", 200
 
         if "message" not in data:
-
             return "OK", 200
 
         message = data["message"]
@@ -868,7 +777,6 @@ def webhook_handler():
         ).strip()
 
         if not chat_id:
-
             return "OK", 200
 
         TARGET_CHAT_ID = chat_id
@@ -879,9 +787,9 @@ def webhook_handler():
             f"Telegram message received: {text}"
         )
 
-        # -------------------------------------------------
+        # =================================================
         # START
-        # -------------------------------------------------
+        # =================================================
 
         if user_text in [
             "/start",
@@ -918,9 +826,10 @@ def webhook_handler():
 
             return "OK", 200
 
-        # -------------------------------------------------
+
+        # =================================================
         # STATUS
-        # -------------------------------------------------
+        # =================================================
 
         if user_text == "/status":
 
@@ -938,9 +847,10 @@ def webhook_handler():
 
             return "OK", 200
 
-        # -------------------------------------------------
+
+        # =================================================
         # MANUAL CHECK
-        # -------------------------------------------------
+        # =================================================
 
         if user_text == "/check":
 
@@ -949,4 +859,272 @@ def webhook_handler():
                 "🔍 सभी recruitment portals check किए जा रहे हैं..."
             )
 
-            for portal_name,
+            for portal_name, portal_data in AUTO_CHECK_URLS.items():
+
+                try:
+
+                    summary, pdf_links = check_portal(
+                        portal_name,
+                        portal_data
+                    )
+
+                    if summary:
+
+                        msg = (
+                            f"📢 *{portal_name}*\n\n"
+                            f"{summary}"
+                        )
+
+                        if pdf_links:
+
+                            msg += (
+                                "\n\n📄 *Official PDFs:*\n"
+                            )
+
+                            for index, pdf in enumerate(
+                                pdf_links[:3],
+                                1
+                            ):
+
+                                msg += (
+                                    f"{index}. "
+                                    f"[PDF]({pdf})\n"
+                                )
+
+                        send_telegram_message(
+                            chat_id,
+                            msg
+                        )
+
+                except Exception as e:
+
+                    print(
+                        f"Manual check error: {e}"
+                    )
+
+            send_telegram_message(
+                chat_id,
+                "✅ सभी portals की checking पूरी हो गई।"
+            )
+
+            return "OK", 200
+
+
+        # =================================================
+        # DIRECT URL
+        # =================================================
+
+        url = clean_url(
+            text
+        )
+
+        if url:
+
+            send_telegram_message(
+                chat_id,
+                "🔍 *Link analyze हो रहा है...*\nकृपया थोड़ा इंतजार करें।"
+            )
+
+            web_text, pdf_links = (
+                fetch_webpage_details(
+                    url
+                )
+            )
+
+            if not is_valid_recruitment_text(
+                web_text
+            ):
+
+                send_telegram_message(
+                    chat_id,
+                    "ℹ️ इस link से उपयोगी recruitment information नहीं मिल पाई।"
+                )
+
+                return "OK", 200
+
+            summary = call_gemini_api(
+                web_text
+            )
+
+            if (
+                not summary
+                or "NO_RECRUITMENT_DATA"
+                in summary
+            ):
+
+                send_telegram_message(
+                    chat_id,
+                    "ℹ️ इस link पर फिलहाल कोई स्पष्ट नई recruitment notification नहीं मिली।"
+                )
+
+            else:
+
+                if pdf_links:
+
+                    summary += (
+                        "\n\n📄 *OFFICIAL PDF LINKS:*\n"
+                    )
+
+                    for index, pdf in enumerate(
+                        pdf_links[:5],
+                        1
+                    ):
+
+                        summary += (
+                            f"{index}. "
+                            f"[Official PDF {index}]({pdf})\n"
+                        )
+
+                send_telegram_message(
+                    chat_id,
+                    summary
+                )
+
+            return "OK", 200
+
+
+        # =================================================
+        # PORTAL NAME
+        # =================================================
+
+        matched_portal = None
+        matched_data = None
+
+        for portal_name, portal_data in AUTO_CHECK_URLS.items():
+
+            if any(
+                key in user_text
+                for key in portal_data["keys"]
+            ):
+
+                matched_portal = portal_name
+                matched_data = portal_data
+                break
+
+        if matched_portal:
+
+            send_portal_update(
+                chat_id,
+                matched_portal,
+                matched_data
+            )
+
+            return "OK", 200
+
+
+        # =================================================
+        # DEFAULT RESPONSE
+        # =================================================
+
+        send_telegram_message(
+            chat_id,
+            """🤖 मैं recruitment monitoring कर रहा हूँ।
+
+आप `/start` भेज सकते हैं।
+
+या लिखें:
+
+🚆 Railway update
+📋 SSC update
+🏛️ RPSC update
+📚 RSSB update
+👨‍🏫 REET update
+⚖️ High Court update
+
+या किसी official website का link भेजें।"""
+        )
+
+        return "OK", 200
+
+    except Exception as e:
+
+        print(
+            "Webhook handler error:",
+            e
+        )
+
+        return "OK", 200
+
+
+# =========================================================
+# STARTUP
+# =========================================================
+
+def startup():
+
+    print(
+        "======================================"
+    )
+
+    print(
+        "Government Recruitment Bot Starting..."
+    )
+
+    print(
+        "======================================"
+    )
+
+    if not TELEGRAM_BOT_TOKEN:
+
+        print(
+            "❌ TELEGRAM_BOT_TOKEN missing!"
+        )
+
+    else:
+
+        print(
+            "✅ Telegram Bot Token loaded."
+        )
+
+        set_webhook()
+
+        get_webhook_info()
+
+    if not GEMINI_API_KEY:
+
+        print(
+            "❌ GEMINI_API_KEY missing!"
+        )
+
+    else:
+
+        print(
+            "✅ Gemini API Key loaded."
+        )
+
+    checker_thread = threading.Thread(
+        target=auto_check_job,
+        daemon=True
+    )
+
+    checker_thread.start()
+
+    print(
+        "✅ Background recruitment checker started."
+    )
+
+
+# =========================================================
+# START BOT
+# =========================================================
+
+startup()
+
+
+# =========================================================
+# LOCAL DEVELOPMENT
+# =========================================================
+
+if __name__ == "__main__":
+
+    port = int(
+        os.environ.get(
+            "PORT",
+            10000
+        )
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
