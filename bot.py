@@ -14,7 +14,7 @@ from flask import Flask, request
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-RENDER_URL = "https://recruitment-bot-2.onrender.com"
+RENDER_URL = "https://recruitment-bot-4.onrender.com"
 
 TELEGRAM_API_URL = (
     f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
