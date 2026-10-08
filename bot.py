@@ -914,19 +914,8 @@ def setup_webhook():
 # START SERVER
 # =========================================================
 
-if __name__ == "__main__":
-
-    # Webhook automatically set
+# Gunicorn के साथ भी webhook सेट करें
+try:
     setup_webhook()
-
-    port = int(
-        os.getenv(
-            "PORT",
-            "10000"
-        )
-    )
-
-    app.run(
-        host="0.0.0.0",
-        port=port
-    )
+except Exception as e:
+    logger.exception("Webhook setup failed: %s", e)
